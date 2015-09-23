@@ -194,7 +194,7 @@ if __name__ == '__main__':
         display_misses(guessed_letters, revealed_word)
 
         if max_misses - misses == 1:
-            print('WARNING: Last guess!')
+            print('WARNING: Last guess (if incorrect)!')
 
     if misses >= max_misses:
         print('\nYOU LOSE! The word was "{}".'.format(random.choice(wordlist)))
@@ -205,5 +205,10 @@ if __name__ == '__main__':
 '''
 FUTURE WORK
 - Command-line options for word-length, number of misses, wordlist filename(?) (with sane defaults if unspecified)?
+  - And/or pre-process the wordlist, and randomly select a word length based on the proportions of lengths in the file
+    (ie. 12-letter words are chosen less often than 5-letter words, because there are fewer of the former)
+    - And calculate max_misses (somehow) based on word length
 - Graphics?
 '''
+
+# vim: expandtab shiftwidth=4 softtabstop=4 tabstop=4
