@@ -17,6 +17,7 @@
 # winning is small.
 
 from __future__ import print_function
+import bisect  # For weighted_choice(_)
 from enum import Enum  # `pip install enum34` to get this module (or delete the log class/method/calls to do without)
 import random
 import sys
@@ -39,7 +40,11 @@ def log(LEVEL, *objs):
 def read_wordlist(filename):
     try:
         with open(filename, 'r') as f:
-            words = [line.strip() for line in f]  # Stripping carriage-returns is important!
+            words = []
+            for line in f:
+                line = line.strip()  # Stripping carriage-returns is important! (and blank lines)
+                if line:
+                    words.append(line)
             return words
     except IOError:
         log(Log.ERROR, 'File "{}" not found.'.format(filename))
@@ -48,6 +53,36 @@ def read_wordlist(filename):
 
 def print_wordlist(wordlist):
     print(wordlist)
+
+
+def determine_word_length_frequencies(wordlist):
+    '''
+    :return: List of tuples of format: (word-length, frequency (ie. raw count))
+    '''
+    frequencies = {}
+    for word in wordlist:
+        length = len(word)
+        frequencies[length] = frequencies.get(length, 0) + 1
+    if 0 in frequencies:  # Raging paranoia: make sure there's no entry for zero-letter words
+        frequencies.pop(0, 0)
+    #log(Log.DEBUG, sorted(frequencies.items()))
+    return frequencies.items()
+
+
+def weighted_choice(choices):
+    '''
+    :type choices: List of tuples of format: (value, weight)
+    '''
+    # From http://stackoverflow.com/questions/3679694/a-weighted-version-of-random-choice/4322940#4322940
+    values, weights = zip(*choices)
+    total = 0
+    cumulative_weights = []
+    for weight in weights:
+        total += weight
+        cumulative_weights.append(total)
+    x = random.random() * total
+    i = bisect.bisect(cumulative_weights, x)
+    return values[i]
 
 
 def count_words_without_letter(wordlist, letter):
@@ -150,20 +185,33 @@ def display_misses(letter_set, word_so_far):
 
 
 if __name__ == '__main__':
-    word_length = 8
-    max_misses = 9
+    word_length = 0  # Invalid; overridden by command-line option or weighted random selection
+    max_misses = 9  # TODO: command-line option, or formula-based (somehow) on word-length
     wordlist_filename = 'wordlist.txt'
 
     misses = 0
     discovered_letter_count = 0
     guessed_letters = set()
-    revealed_word = '*' * word_length
+    current_guess = ''
 
     wordlist = read_wordlist(wordlist_filename)
     #log(Log.DEBUG, print_wordlist(wordlist))
-    wordlist = remove_words_of_wrong_length(wordlist, word_length)
+    if not wordlist:
+        log(Log.ERROR, 'Wordlist "{}" is empty.'.format(wordlist_filename))
+        sys.exit(-1)
 
-    current_guess = ''
+    # Weighted random word_length if no command-line length specified
+    if not word_length:
+        word_length_frequencies = determine_word_length_frequencies(wordlist)
+        word_length = weighted_choice(word_length_frequencies)
+
+    revealed_word = '*' * word_length
+
+    wordlist = remove_words_of_wrong_length(wordlist, word_length)
+    if not wordlist:
+        log(Log.ERROR, 'Wordlist "{}" contains no words of length {}.'.format(wordlist_filename, word_length))
+        sys.exit(-1)
+
 
     print('HANGMAN\nThe word is {} letters long, and you are allowed {} incorrect guesses.'.format(word_length, max_misses))
 
@@ -171,9 +219,9 @@ if __name__ == '__main__':
     while discovered_letter_count < word_length  and  misses < max_misses:
         # Don't allow empty or invalid or previous guesses
         while (not current_guess  or
-               current_guess not in 'abcdefghijklmnopqrstuvwxyz'  or
-               current_guess in guessed_letters  or
-               len(current_guess) != 1):
+                       current_guess not in 'abcdefghijklmnopqrstuvwxyz'  or
+                       current_guess in guessed_letters  or
+                       len(current_guess) != 1):
             current_guess = raw_input('Letter to guess: ').lower()
         guessed_letters.add(current_guess)
 
@@ -205,9 +253,7 @@ if __name__ == '__main__':
 '''
 FUTURE WORK
 - Command-line options for word-length, number of misses, wordlist filename(?) (with sane defaults if unspecified)?
-  - And/or pre-process the wordlist, and randomly select a word length based on the proportions of lengths in the file
-    (ie. 12-letter words are chosen less often than 5-letter words, because there are fewer of the former)
-    - And calculate max_misses (somehow) based on word length
+- Calculate optimal max_misses by (some!) formula based on word length
 - Graphics?
 '''
 
