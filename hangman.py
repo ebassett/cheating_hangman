@@ -17,6 +17,7 @@
 # winning is small.
 
 from __future__ import print_function
+import argparse
 import bisect  # For weighted_choice(_)
 from enum import Enum  # `pip install enum34` to get this module (or delete the log class/method/calls to do without)
 import random
@@ -35,6 +36,16 @@ class Log(Enum):
 
 def log(LEVEL, *objs):
     print(str(LEVEL) + ':', *objs, file=sys.stderr)
+
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='HANGMAN - optionally set any of: word length, maximum incorrect guesses, filename of wordlist')
+    parser.add_argument('-l', '--length', type=int, dest='word_length',       metavar='WORD_LENGTH',       help='The number of letters in the word')
+    parser.add_argument('-m', '--misses', type=int, dest='max_misses',        metavar='MAX_WRONG_GUESSES', help='The number of incorrect guesses allowed')
+    parser.add_argument('-f', '--file',             dest='wordlist_filename', metavar='WORDLIST_FILENAME', help='The filename of the wordlist')
+    args = parser.parse_args()
+    return args
 
 
 def read_wordlist(filename):
@@ -185,25 +196,33 @@ def display_misses(letter_set, word_so_far):
 
 
 if __name__ == '__main__':
-    word_length = 0  # Invalid; overridden by command-line option or weighted random selection
-    max_misses = 9  # TODO: command-line option, or formula-based (somehow) on word-length
-    wordlist_filename = 'wordlist.txt'
+    args = parse_args()
+    #log(Log.DEBUG, 'Args: ', args)
+    # Missing or invalid values will be corrected later, before use.
+    wordlist_filename = args.wordlist_filename
+    word_length = args.word_length
+    max_misses = args.max_misses
 
     misses = 0
     discovered_letter_count = 0
     guessed_letters = set()
     current_guess = ''
 
+    if not wordlist_filename:
+        wordlist_filename = 'wordlist.txt'
     wordlist = read_wordlist(wordlist_filename)
     #log(Log.DEBUG, print_wordlist(wordlist))
     if not wordlist:
         log(Log.ERROR, 'Wordlist "{}" is empty.'.format(wordlist_filename))
         sys.exit(-1)
 
-    # Weighted random word_length if no command-line length specified
-    if not word_length:
+    # Weighted random word_length if no or invalid command-line length specified
+    if not word_length  or  word_length <= 0:
         word_length_frequencies = determine_word_length_frequencies(wordlist)
         word_length = weighted_choice(word_length_frequencies)
+
+    if max_misses < 0:
+        max_misses = 8  # TODO: formula-based (somehow) on word-length
 
     revealed_word = '*' * word_length
 
@@ -211,7 +230,6 @@ if __name__ == '__main__':
     if not wordlist:
         log(Log.ERROR, 'Wordlist "{}" contains no words of length {}.'.format(wordlist_filename, word_length))
         sys.exit(-1)
-
 
     print('HANGMAN\nThe word is {} letters long, and you are allowed {} incorrect guesses.'.format(word_length, max_misses))
 
@@ -252,8 +270,7 @@ if __name__ == '__main__':
 
 '''
 FUTURE WORK
-- Command-line options for word-length, number of misses, wordlist filename(?) (with sane defaults if unspecified)?
-- Calculate optimal max_misses by (some!) formula based on word length
+- Calculate "optimal" max_misses by (some!) formula based on word length
 - Graphics?
 '''
 
